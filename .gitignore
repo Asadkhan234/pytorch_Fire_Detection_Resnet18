@@ -30,7 +30,7 @@ deep_learning_venv/
 # PyTorch / Model Files
 # =========================
 
-*.pth
+
 *.pt
 *.h5
 *.onnx

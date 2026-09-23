@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import "./App.css";
 
-const API_URL = "http://127.0.0.1:8000/predict";
+const API_URL = "https://pytorch-fire-detection-resnet18.onrender.com";
 
 function App() {
   const [file, setFile] = useState(null);
