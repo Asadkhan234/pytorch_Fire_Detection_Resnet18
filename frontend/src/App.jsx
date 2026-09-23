@@ -13,16 +13,30 @@ function App() {
   const [error, setError] = useState("");
   const inputRef = useRef(null);
 
-  useEffect(() => () => preview && URL.revokeObjectURL(preview), [preview]);
+  useEffect(() => {
+    return () => {
+      if (preview) {
+        URL.revokeObjectURL(preview);
+      }
+    };
+  }, [preview]);
 
   const isFire = String(prediction).toLowerCase() === "fire";
-  const state = loading ? "scanning" : !prediction ? "idle" : isFire ? "fire" : "clear";
+
+  const state = loading
+    ? "scanning"
+    : !prediction
+    ? "idle"
+    : isFire
+    ? "fire"
+    : "clear";
 
   const loadFile = (f) => {
     if (!f || !f.type.startsWith("image/")) {
       setError("That file isn't an image. Choose a PNG or JPG.");
       return;
     }
+
     setFile(f);
     setPreview(URL.createObjectURL(f));
     setPrediction(null);
@@ -32,19 +46,35 @@ function App() {
 
   const analyze = async () => {
     if (!file) return;
+
     setLoading(true);
     setPrediction(null);
+    setConfidence(null);
     setError("");
+
     const body = new FormData();
     body.append("file", file);
+
     try {
-      const res = await fetch(API_URL, { method: "POST", body });
-      if (!res.ok) throw new Error();
+      const res = await fetch(`${API_URL}/predict`, {
+        method: "POST",
+        body,
+      });
+
+      if (!res.ok) {
+        throw new Error(`Server returned ${res.status}`);
+      }
+
       const data = await res.json();
+
       setPrediction(data.prediction);
       setConfidence(Number(data.confidence));
-    } catch {
-      setError("Can't reach the model server. Start the FastAPI backend on port 8000, then try again.");
+    } catch (error) {
+      console.error("Prediction error:", error);
+
+      setError(
+        "Unable to connect to the Fire Detection API. Please try again."
+      );
     } finally {
       setLoading(false);
     }
@@ -56,7 +86,10 @@ function App() {
     setPrediction(null);
     setConfidence(null);
     setError("");
-    if (inputRef.current) inputRef.current.value = "";
+
+    if (inputRef.current) {
+      inputRef.current.value = "";
+    }
   };
 
   return (
@@ -66,29 +99,55 @@ function App() {
           <span className="logo-mark" aria-hidden="true" />
           FireDetect
         </div>
-        <span className="model-tag">ResNet18 · PyTorch</span>
+
+        <span className="model-tag">
+          ResNet18 · PyTorch
+        </span>
       </header>
 
       <main className="stage">
         <section className="viewer" aria-label="Image to analyze">
           <div
             className={`frame ${dragging ? "drag" : ""}`}
-            onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+            onDragOver={(e) => {
+              e.preventDefault();
+              setDragging(true);
+            }}
             onDragLeave={() => setDragging(false)}
-            onDrop={(e) => { e.preventDefault(); setDragging(false); loadFile(e.dataTransfer.files[0]); }}
+            onDrop={(e) => {
+              e.preventDefault();
+              setDragging(false);
+              loadFile(e.dataTransfer.files[0]);
+            }}
           >
-            <i className="corner tl" /><i className="corner tr" />
-            <i className="corner bl" /><i className="corner br" />
+            <i className="corner tl" />
+            <i className="corner tr" />
+            <i className="corner bl" />
+            <i className="corner br" />
 
             {preview ? (
-              <img src={preview} alt="Image selected for analysis" />
+              <img
+                src={preview}
+                alt="Image selected for analysis"
+              />
             ) : (
-              <button className="drop" onClick={() => inputRef.current?.click()}>
+              <button
+                className="drop"
+                onClick={() => inputRef.current?.click()}
+              >
                 <strong>Drop an image here</strong>
-                <span>or click to browse. PNG and JPG work.</span>
+                <span>
+                  or click to browse. PNG and JPG work.
+                </span>
               </button>
             )}
-            {loading && <div className="scanline" aria-hidden="true" />}
+
+            {loading && (
+              <div
+                className="scanline"
+                aria-hidden="true"
+              />
+            )}
           </div>
 
           <input
@@ -100,53 +159,116 @@ function App() {
           />
 
           <div className="controls">
-            <button className="btn primary" onClick={analyze} disabled={!file || loading}>
+            <button
+              className="btn primary"
+              onClick={analyze}
+              disabled={!file || loading}
+            >
               {loading ? "Analyzing…" : "Check for fire"}
             </button>
-            <button className="btn" onClick={() => inputRef.current?.click()}>
+
+            <button
+              className="btn"
+              onClick={() => inputRef.current?.click()}
+            >
               {file ? "Change image" : "Choose image"}
             </button>
-            {file && <button className="btn ghost" onClick={reset}>Clear</button>}
+
             {file && (
-              <span className="fname" title={file.name}>
-                {file.name} · {(file.size / 1024).toFixed(0)} KB
+              <button
+                className="btn ghost"
+                onClick={reset}
+              >
+                Clear
+              </button>
+            )}
+
+            {file && (
+              <span
+                className="fname"
+                title={file.name}
+              >
+                {file.name} ·{" "}
+                {(file.size / 1024).toFixed(0)} KB
               </span>
             )}
           </div>
 
-          {error && <p className="error" role="alert">{error}</p>}
+          {error && (
+            <p className="error" role="alert">
+              {error}
+            </p>
+          )}
         </section>
 
-        <aside className="readout" aria-live="polite">
-          <p className="verdict-label">Result</p>
+        <aside
+          className="readout"
+          aria-live="polite"
+        >
+          <p className="verdict-label">
+            Result
+          </p>
 
           {state === "idle" && (
             <>
-              <h2 className="verdict">No image checked yet</h2>
-              <p className="note">Add an image and select Check for fire. The result and the model's confidence appear here.</p>
+              <h2 className="verdict">
+                No image checked yet
+              </h2>
+
+              <p className="note">
+                Add an image and select Check for fire.
+                The result and the model's confidence
+                appear here.
+              </p>
             </>
           )}
 
           {state === "scanning" && (
             <>
-              <h2 className="verdict">Analyzing…</h2>
-              <p className="note">The model is scanning the image.</p>
+              <h2 className="verdict">
+                Analyzing…
+              </h2>
+
+              <p className="note">
+                The model is scanning the image.
+              </p>
             </>
           )}
 
           {(state === "fire" || state === "clear") && (
             <>
-              <h2 className="verdict">{isFire ? "Fire detected" : "No fire detected"}</h2>
+              <h2 className="verdict">
+                {isFire
+                  ? "Fire detected"
+                  : "No fire detected"}
+              </h2>
 
               <div className="meter">
                 <div className="meter-head">
                   <span>Confidence</span>
-                  <strong>{confidence?.toFixed(1)}%</strong>
+
+                  <strong>
+                    {confidence?.toFixed(1)}%
+                  </strong>
                 </div>
+
                 <div className="meter-track">
-                  <span className="meter-pin" style={{ left: `${Math.min(100, Math.max(0, confidence))}%` }} />
+                  <span
+                    className="meter-pin"
+                    style={{
+                      left: `${Math.min(
+                        100,
+                        Math.max(0, confidence || 0)
+                      )}%`,
+                    }}
+                  />
                 </div>
-                <div className="meter-scale"><span>0</span><span>50</span><span>100</span></div>
+
+                <div className="meter-scale">
+                  <span>0</span>
+                  <span>50</span>
+                  <span>100</span>
+                </div>
               </div>
 
               <p className="note">
